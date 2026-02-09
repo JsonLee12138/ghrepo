@@ -357,3 +357,83 @@ func joinPath(base, rel string) string {
 	}
 	return base + "/" + rel
 }
+
+// MutationResult holds the result of a write or delete operation.
+type MutationResult struct {
+	Action string // "created", "updated", "deleted"
+	Path   string
+	SHA    string // commit SHA
+	Branch string
+}
+
+// CreateOrUpdateFile creates or updates a file in the repository.
+// It auto-detects whether the file exists (update with SHA) or not (create).
+func (s *RepoService) CreateOrUpdateFile(branch, path, message string, content []byte) (*MutationResult, error) {
+	// Try to get existing file SHA for update detection.
+	var existingSHA string
+	action := "created"
+	raw, err := s.Client.GetContents(s.Owner, s.Repo, path, branch)
+	if err == nil {
+		var item contentsItem
+		if jsonErr := json.Unmarshal(raw, &item); jsonErr == nil && item.SHA != "" && item.Type == "file" {
+			existingSHA = item.SHA
+			action = "updated"
+		}
+	}
+	// If GetContents returned 404, that's fine — it's a create.
+
+	encoded := base64.StdEncoding.EncodeToString(content)
+	req := &githubapi.PutContentsRequest{
+		Message: message,
+		Content: encoded,
+		SHA:     existingSHA,
+		Branch:  branch,
+	}
+
+	result, err := s.Client.PutContents(s.Owner, s.Repo, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MutationResult{
+		Action: action,
+		Path:   path,
+		SHA:    result.Commit.SHA,
+		Branch: branch,
+	}, nil
+}
+
+// DeleteFile deletes a file from the repository.
+func (s *RepoService) DeleteFile(branch, path, message string) (*MutationResult, error) {
+	// Get the file's current SHA (required for delete).
+	raw, err := s.Client.GetContents(s.Owner, s.Repo, path, branch)
+	if err != nil {
+		return nil, err
+	}
+
+	var item contentsItem
+	if err := json.Unmarshal(raw, &item); err != nil || item.SHA == "" {
+		return nil, clerrors.NewNotFound(fmt.Sprintf("file %q not found", path), nil)
+	}
+	if item.Type != "file" {
+		return nil, clerrors.NewBadArgs(fmt.Sprintf("path %q is a %s, not a file", path, item.Type), nil)
+	}
+
+	req := &githubapi.DeleteContentsRequest{
+		Message: message,
+		SHA:     item.SHA,
+		Branch:  branch,
+	}
+
+	result, err := s.Client.DeleteContents(s.Owner, s.Repo, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MutationResult{
+		Action: "deleted",
+		Path:   path,
+		SHA:    result.Commit.SHA,
+		Branch: branch,
+	}, nil
+}

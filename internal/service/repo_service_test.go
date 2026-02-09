@@ -430,3 +430,206 @@ func TestStat_WithRef(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+// --- CreateOrUpdateFile tests ---
+
+func TestCreateOrUpdateFile_Create(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/repos/owner/repo/contents/new-file.txt":
+			// File does not exist.
+			w.WriteHeader(404)
+			w.Write([]byte(`{"message":"Not Found"}`))
+		case r.Method == "PUT" && r.URL.Path == "/repos/owner/repo/contents/new-file.txt":
+			w.WriteHeader(201)
+			json.NewEncoder(w).Encode(map[string]any{
+				"content": map[string]any{
+					"path": "new-file.txt",
+					"sha":  "file-sha",
+				},
+				"commit": map[string]any{
+					"sha": "commit-sha-123",
+				},
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(500)
+		}
+	}))
+	defer srv.Close()
+
+	svc := newTestService(srv.URL)
+	result, err := svc.CreateOrUpdateFile("", "new-file.txt", "add file", []byte("hello"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Action != "created" {
+		t.Errorf("action: got %q, want created", result.Action)
+	}
+	if result.SHA != "commit-sha-123" {
+		t.Errorf("sha: got %q, want commit-sha-123", result.SHA)
+	}
+	if result.Path != "new-file.txt" {
+		t.Errorf("path: got %q, want new-file.txt", result.Path)
+	}
+}
+
+func TestCreateOrUpdateFile_Update(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/repos/owner/repo/contents/existing.txt":
+			// File exists.
+			json.NewEncoder(w).Encode(map[string]any{
+				"type": "file",
+				"path": "existing.txt",
+				"sha":  "old-sha",
+				"size": 5,
+			})
+		case r.Method == "PUT" && r.URL.Path == "/repos/owner/repo/contents/existing.txt":
+			// Verify SHA is included in request body.
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			if body["sha"] != "old-sha" {
+				t.Errorf("expected sha old-sha in body, got %v", body["sha"])
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"content": map[string]any{
+					"path": "existing.txt",
+					"sha":  "new-file-sha",
+				},
+				"commit": map[string]any{
+					"sha": "commit-sha-456",
+				},
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(500)
+		}
+	}))
+	defer srv.Close()
+
+	svc := newTestService(srv.URL)
+	result, err := svc.CreateOrUpdateFile("", "existing.txt", "update file", []byte("updated"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Action != "updated" {
+		t.Errorf("action: got %q, want updated", result.Action)
+	}
+	if result.SHA != "commit-sha-456" {
+		t.Errorf("sha: got %q, want commit-sha-456", result.SHA)
+	}
+}
+
+func TestCreateOrUpdateFile_WithBranch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET":
+			w.WriteHeader(404)
+			w.Write([]byte(`{"message":"Not Found"}`))
+		case r.Method == "PUT":
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			if body["branch"] != "feature" {
+				t.Errorf("expected branch feature, got %v", body["branch"])
+			}
+			w.WriteHeader(201)
+			json.NewEncoder(w).Encode(map[string]any{
+				"content": map[string]any{"path": "f.txt", "sha": "s"},
+				"commit":  map[string]any{"sha": "c"},
+			})
+		default:
+			w.WriteHeader(500)
+		}
+	}))
+	defer srv.Close()
+
+	svc := newTestService(srv.URL)
+	result, err := svc.CreateOrUpdateFile("feature", "f.txt", "msg", []byte("data"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Branch != "feature" {
+		t.Errorf("branch: got %q, want feature", result.Branch)
+	}
+}
+
+// --- DeleteFile tests ---
+
+func TestDeleteFile_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/repos/owner/repo/contents/old-file.txt":
+			json.NewEncoder(w).Encode(map[string]any{
+				"type": "file",
+				"path": "old-file.txt",
+				"sha":  "file-sha",
+				"size": 10,
+			})
+		case r.Method == "DELETE" && r.URL.Path == "/repos/owner/repo/contents/old-file.txt":
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			if body["sha"] != "file-sha" {
+				t.Errorf("expected sha file-sha, got %v", body["sha"])
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"content": nil,
+				"commit": map[string]any{
+					"sha": "delete-commit-sha",
+				},
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(500)
+		}
+	}))
+	defer srv.Close()
+
+	svc := newTestService(srv.URL)
+	result, err := svc.DeleteFile("", "old-file.txt", "delete file")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Action != "deleted" {
+		t.Errorf("action: got %q, want deleted", result.Action)
+	}
+	if result.SHA != "delete-commit-sha" {
+		t.Errorf("sha: got %q, want delete-commit-sha", result.SHA)
+	}
+}
+
+func TestDeleteFile_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+		w.Write([]byte(`{"message":"Not Found"}`))
+	}))
+	defer srv.Close()
+
+	svc := newTestService(srv.URL)
+	_, err := svc.DeleteFile("", "nonexistent.txt", "delete")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	ce, ok := err.(*clerrors.CLIError)
+	if !ok {
+		t.Fatalf("expected CLIError, got %T", err)
+	}
+	if ce.ExitCode() != clerrors.ExitNotFound {
+		t.Errorf("exit code: got %d, want %d", ce.ExitCode(), clerrors.ExitNotFound)
+	}
+}
+
+func TestDeleteFile_Directory(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"type": "file", "path": "docs/a.md", "sha": "aaa", "size": 10},
+		})
+	}))
+	defer srv.Close()
+
+	svc := newTestService(srv.URL)
+	_, err := svc.DeleteFile("", "docs", "delete dir")
+	if err == nil {
+		t.Fatal("expected error for directory delete")
+	}
+}

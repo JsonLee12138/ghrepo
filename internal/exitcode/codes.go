@@ -17,6 +17,7 @@ const (
 	ExitTransport      = 14
 	ExitRateLimit      = 15
 	ExitLocalWriteErr  = 16
+	ExitUserAbort      = 17
 )
 
 // Category classifies an error for exit-code mapping.
@@ -30,6 +31,7 @@ const (
 	CatTransport                      // timeout / network
 	CatRateLimit                      // 403 rate-limited
 	CatLocalWriteErr                  // local I/O failure
+	CatUserAbort                      // user cancelled operation
 )
 
 // CLIError is the single error type that reaches main and maps to an exit code.
@@ -65,6 +67,8 @@ func (e *CLIError) ExitCode() int {
 		return ExitRateLimit
 	case CatLocalWriteErr:
 		return ExitLocalWriteErr
+	case CatUserAbort:
+		return ExitUserAbort
 	default:
 		return 1
 	}
@@ -98,6 +102,10 @@ func NewNotFound(msg string, err error) *CLIError {
 
 func NewLocalWriteErr(msg string, err error) *CLIError {
 	return &CLIError{Cat: CatLocalWriteErr, Message: msg, Err: err}
+}
+
+func NewUserAbort(msg string, err error) *CLIError {
+	return &CLIError{Cat: CatUserAbort, Message: msg, Err: err}
 }
 
 // ClassifyHTTP converts an HTTP status code plus optional context into a CLIError.

@@ -1,6 +1,6 @@
 # ghrepo
 
-Read-only CLI for GitHub repository contents. Browse, inspect, and download files from any GitHub repository without cloning.
+CLI for GitHub repository contents. Browse, inspect, download, create, update, and delete files in any GitHub repository without cloning.
 
 ## Installation
 
@@ -22,6 +22,39 @@ go install githubRAGCli/cmd/ghrepo@latest
 ### From GitHub Releases
 
 Download the binary for your platform from [Releases](https://github.com/JsonLee12138/ghrepo/releases), extract it, and add it to your `PATH`.
+
+### Agent Skill
+
+Install ghrepo as an [Agent Skill](https://agentskills.io/) for Claude Code, Cursor, Codex and other AI coding agents:
+
+```bash
+npx skills add JsonLee12138/ghrepo
+```
+
+## Upgrade
+
+### Homebrew
+
+```bash
+brew update
+brew upgrade --cask ghrepo
+```
+
+### From Source
+
+```bash
+go install githubRAGCli/cmd/ghrepo@latest
+```
+
+### From GitHub Releases
+
+Download the latest version from [Releases](https://github.com/JsonLee12138/ghrepo/releases) and replace the existing binary.
+
+### Agent Skill
+
+```bash
+npx skills add JsonLee12138/ghrepo
+```
 
 ## Authentication
 
@@ -46,6 +79,14 @@ ghrepo auth check
 ```
 
 ## Usage
+
+### Initialize project
+
+Generate an `AGENTS.md` file in the current directory, configured for a specific repository:
+
+```bash
+ghrepo init owner/repo
+```
 
 ### List directory contents
 
@@ -74,6 +115,29 @@ ghrepo cat owner/repo src/main.go --ref v1.0.0
 ```bash
 ghrepo get owner/repo src/ --out ./local-src
 ghrepo get owner/repo README.md --out ./README.md --overwrite
+```
+
+### Create or update a file
+
+```bash
+# Upload a local file (will prompt for confirmation)
+ghrepo put owner/repo path/to/file.txt -m "add file" --file ./local.txt
+
+# Upload from stdin (requires --yes)
+echo "hello" | ghrepo put owner/repo file.txt -m "create file" --stdin --yes
+
+# Specify a branch
+ghrepo put owner/repo config.yml -m "update config" --file ./config.yml -b develop
+```
+
+### Delete a file
+
+```bash
+# Delete a file (will prompt for confirmation)
+ghrepo rm owner/repo path/to/old-file.txt -m "remove old file"
+
+# Skip confirmation
+ghrepo rm owner/repo temp.txt -m "cleanup" --yes
 ```
 
 ## Global Flags

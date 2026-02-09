@@ -21,7 +21,7 @@ var (
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "ghrepo",
-		Short:         "Read-only CLI for GitHub repository contents",
+		Short:         "CLI for GitHub repository contents",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -32,11 +32,14 @@ func NewRootCmd() *cobra.Command {
 	root.PersistentFlags().BoolVar(&flagJSON, "json", false, "Output in JSON format")
 	root.PersistentFlags().BoolVar(&flagVerbose, "verbose", false, "Enable verbose output (never prints token)")
 
+	root.AddCommand(newInitCmd())
 	root.AddCommand(newAuthCmd())
 	root.AddCommand(newStatCmd())
 	root.AddCommand(newLsCmd())
 	root.AddCommand(newCatCmd())
 	root.AddCommand(newGetCmd())
+	root.AddCommand(newPutCmd())
+	root.AddCommand(newRmCmd())
 
 	return root
 }

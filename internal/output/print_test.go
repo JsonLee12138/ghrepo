@@ -127,3 +127,56 @@ func TestPrintEntries_JSON(t *testing.T) {
 		t.Errorf("unexpected types: %+v", decoded)
 	}
 }
+
+func TestPrintMutationResult_Text(t *testing.T) {
+	var buf bytes.Buffer
+	r := MutationResultData{
+		Action: "created",
+		Path:   "new-file.txt",
+		SHA:    "abc123",
+		Branch: "main",
+	}
+	if err := PrintMutationResult(&buf, r, false); err != nil {
+		t.Fatal(err)
+	}
+	want := "action: created\npath: new-file.txt\nsha: abc123\nbranch: main\n"
+	if buf.String() != want {
+		t.Errorf("got:\n%s\nwant:\n%s", buf.String(), want)
+	}
+}
+
+func TestPrintMutationResult_TextNoBranch(t *testing.T) {
+	var buf bytes.Buffer
+	r := MutationResultData{
+		Action: "deleted",
+		Path:   "old-file.txt",
+		SHA:    "def456",
+	}
+	if err := PrintMutationResult(&buf, r, false); err != nil {
+		t.Fatal(err)
+	}
+	want := "action: deleted\npath: old-file.txt\nsha: def456\n"
+	if buf.String() != want {
+		t.Errorf("got:\n%s\nwant:\n%s", buf.String(), want)
+	}
+}
+
+func TestPrintMutationResult_JSON(t *testing.T) {
+	var buf bytes.Buffer
+	r := MutationResultData{
+		Action: "updated",
+		Path:   "file.txt",
+		SHA:    "sha789",
+		Branch: "dev",
+	}
+	if err := PrintMutationResult(&buf, r, true); err != nil {
+		t.Fatal(err)
+	}
+	var decoded MutationResultData
+	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if decoded.Action != "updated" || decoded.Path != "file.txt" || decoded.SHA != "sha789" || decoded.Branch != "dev" {
+		t.Errorf("unexpected decoded result: %+v", decoded)
+	}
+}

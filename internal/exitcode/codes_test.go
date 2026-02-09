@@ -16,6 +16,7 @@ func TestExitCode_Mapping(t *testing.T) {
 		{CatTransport, 14},
 		{CatRateLimit, 15},
 		{CatLocalWriteErr, 16},
+		{CatUserAbort, 17},
 	}
 	for _, tt := range tests {
 		e := &CLIError{Cat: tt.cat, Message: "test"}

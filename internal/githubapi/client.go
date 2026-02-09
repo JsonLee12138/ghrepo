@@ -1,6 +1,7 @@
 package githubapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -153,4 +154,78 @@ func isRateLimited(resp *http.Response) bool {
 		return true
 	}
 	return false
+}
+
+// PutContentsRequest is the JSON body for PUT /repos/{owner}/{repo}/contents/{path}.
+type PutContentsRequest struct {
+	Message string `json:"message"`
+	Content string `json:"content"`           // base64-encoded
+	SHA     string `json:"sha,omitempty"`      // required for update, empty for create
+	Branch  string `json:"branch,omitempty"`
+}
+
+// DeleteContentsRequest is the JSON body for DELETE /repos/{owner}/{repo}/contents/{path}.
+type DeleteContentsRequest struct {
+	Message string `json:"message"`
+	SHA     string `json:"sha"`
+	Branch  string `json:"branch,omitempty"`
+}
+
+// ContentsCommitResult holds the commit info returned by PUT/DELETE Contents API.
+type ContentsCommitResult struct {
+	Content *struct {
+		Path string `json:"path"`
+		SHA  string `json:"sha"`
+	} `json:"content"`
+	Commit struct {
+		SHA string `json:"sha"`
+	} `json:"commit"`
+}
+
+// PutContents calls PUT /repos/{owner}/{repo}/contents/{path}.
+func (c *Client) PutContents(owner, repo, path string, body *PutContentsRequest) (*ContentsCommitResult, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.BaseURL, owner, repo, path)
+	return doJSON[ContentsCommitResult](c, "PUT", url, body)
+}
+
+// DeleteContents calls DELETE /repos/{owner}/{repo}/contents/{path}.
+func (c *Client) DeleteContents(owner, repo, path string, body *DeleteContentsRequest) (*ContentsCommitResult, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.BaseURL, owner, repo, path)
+	return doJSON[ContentsCommitResult](c, "DELETE", url, body)
+}
+
+// doJSON performs an authenticated request with a JSON body and decodes the response.
+func doJSON[T any](c *Client, method, url string, payload any) (*T, error) {
+	jsonBody, err := json.Marshal(payload)
+	if err != nil {
+		return nil, clerrors.NewTransport("failed to marshal request body", err)
+	}
+
+	req, err := http.NewRequest(method, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, clerrors.NewTransport("failed to build request", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, clerrors.ClassifyTransportErr(err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		rateLimited := isRateLimited(resp)
+		return nil, clerrors.ClassifyHTTP(resp.StatusCode, rateLimited, string(respBody))
+	}
+
+	var result T
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, clerrors.NewTransport("failed to parse response", err)
+	}
+	return &result, nil
 }

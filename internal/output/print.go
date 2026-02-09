@@ -75,3 +75,27 @@ func PrintEntries(w io.Writer, entries []EntryData, asJSON bool) error {
 	}
 	return nil
 }
+
+// MutationResultData represents the result of a write or delete operation.
+type MutationResultData struct {
+	Action string `json:"action"` // "created", "updated", "deleted"
+	Path   string `json:"path"`
+	SHA    string `json:"sha"`    // commit SHA
+	Branch string `json:"branch,omitempty"`
+}
+
+// PrintMutationResult writes a mutation result to w in text or JSON format.
+func PrintMutationResult(w io.Writer, r MutationResultData, asJSON bool) error {
+	if asJSON {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(r)
+	}
+	fmt.Fprintf(w, "action: %s\n", r.Action)
+	fmt.Fprintf(w, "path: %s\n", r.Path)
+	fmt.Fprintf(w, "sha: %s\n", r.SHA)
+	if r.Branch != "" {
+		fmt.Fprintf(w, "branch: %s\n", r.Branch)
+	}
+	return nil
+}

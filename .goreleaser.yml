@@ -21,7 +21,7 @@ homebrew_casks:
     binaries:
       - ghrepo
     homepage: "https://github.com/JsonLee12138/ghrepo"
-    description: "Read-only GitHub repository CLI tool"
+    description: "GitHub repository CLI tool"
     repository:
       owner: JsonLee12138
       name: homebrew-ghrepo

@@ -1,11 +1,13 @@
 # ghrepo 使用文档（v0.1 草案）
 
 ## 1. 工具目标
-`ghrepo` 是一个只读 CLI 工具，用于通过 GitHub Token 访问仓库中的目录和文件，支持：
+`ghrepo` 是一个 CLI 工具，用于通过 GitHub Token 访问和管理仓库中的目录和文件，支持：
 - 查看目录结构
 - 读取文件内容
 - 下载文件或目录
 - 查询路径元信息
+- 创建或更新文件
+- 删除文件
 
 默认面向 GitHub.com，后续可通过 `--api-base` 支持 GitHub Enterprise Server (GHES)。
 
@@ -37,19 +39,36 @@ export GITHUB_TOKEN=ghp_xxx
 3. `GH_TOKEN`
 
 ### 3.3 最小权限建议
-- Fine-grained PAT：`Contents: Read`
+- 只读操作：Fine-grained PAT：`Contents: Read`
+- 写入/删除操作：Fine-grained PAT：`Contents: Read and Write`
 
 ## 4. 命令总览
 
 ```bash
+ghrepo init <owner/repo>
 ghrepo auth check
 ghrepo ls <owner/repo> <path> [--ref <ref>] [--recursive] [--json]
 ghrepo cat <owner/repo> <path> [--ref <ref>]
 ghrepo get <owner/repo> <path> --out <local-path> [--ref <ref>] [--overwrite]
 ghrepo stat <owner/repo> <path> [--ref <ref>] [--json]
+ghrepo put <owner/repo> <path> -m <msg> (--file <local-path> | --stdin) [-b <branch>] [--yes]
+ghrepo rm <owner/repo> <path> -m <msg> [-b <branch>] [--yes]
 ```
 
 ## 5. 详细命令
+
+### 5.0 `init`
+在当前目录生成 `AGENTS.md` 文件，写入目标仓库地址及常用命令参考。
+
+示例：
+```bash
+ghrepo init owner/repo
+```
+
+行为说明：
+- 在当前工作目录下创建 `AGENTS.md` 文件
+- 如果文件已存在，会报错并退出（需手动删除后重新初始化）
+- 不需要 Token
 
 ### 5.1 `auth check`
 检查 Token 是否可用、是否可访问 GitHub API。
@@ -121,6 +140,52 @@ ghrepo stat owner/repo docs --json
 - `size`（目录为 0 或省略）
 - `download_url`（文件时可用）
 
+### 5.6 `put`
+创建或更新仓库中的文件。自动检测文件是否存在（创建 vs 更新）。
+
+**执行前会要求二次确认，输入 `y` 确认操作。**
+
+示例：
+```bash
+# 从本地文件上传
+ghrepo put owner/repo path/to/file.txt -m "add file" --file ./local.txt
+
+# 从 stdin 读取内容（需配合 --yes）
+echo "hello" | ghrepo put owner/repo file.txt -m "create" --stdin --yes
+
+# 指定目标分支
+ghrepo put owner/repo config.yml -m "update config" --file ./config.yml -b develop
+
+# 跳过确认
+ghrepo put owner/repo file.txt -m "msg" --file ./f.txt --yes
+```
+
+参数说明：
+- `-m` / `--message`：提交信息（必填）
+- `--file <path>`：从本地文件读取内容
+- `--stdin`：从标准输入读取内容（与 `--file` 互斥）
+- `-b` / `--branch`：目标分支（可选，默认为仓库默认分支）
+- `-y` / `--yes`：跳过确认提示
+
+### 5.7 `rm`
+删除仓库中的文件。
+
+**执行前会要求二次确认，输入 `y` 确认操作。**
+
+示例：
+```bash
+# 删除文件（会提示确认）
+ghrepo rm owner/repo old-file.txt -m "remove old file"
+
+# 指定分支并跳过确认
+ghrepo rm owner/repo temp.txt -m "cleanup" -b develop --yes
+```
+
+参数说明：
+- `-m` / `--message`：提交信息（必填）
+- `-b` / `--branch`：目标分支（可选）
+- `-y` / `--yes`：跳过确认提示
+
 ## 6. 全局参数
 - `--token <token>`：显式传入 Token（优先级最高）
 - `--api-base <url>`：自定义 API 地址（GHES）
@@ -143,6 +208,7 @@ ghrepo stat owner/repo docs --json
 - `14`：网络或超时错误
 - `15`：被限流
 - `16`：本地文件写入失败
+- `17`：用户取消操作
 
 ## 8. 常见使用流程
 ```bash
@@ -160,6 +226,12 @@ ghrepo cat owner/repo path/to/file --ref main
 
 # 5) 下载目录
 ghrepo get owner/repo path/to/dir --out ./backup --ref main
+
+# 6) 上传文件
+ghrepo put owner/repo path/to/new-file.txt -m "add file" --file ./local.txt
+
+# 7) 删除文件
+ghrepo rm owner/repo path/to/old-file.txt -m "remove file"
 ```
 
 ## 9. 兼容性说明
