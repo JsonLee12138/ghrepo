@@ -1,6 +1,36 @@
 # ghrepo
 
+English | [中文](./README.zh.md)
+
 CLI for GitHub repository contents. Browse, inspect, download, create, update, and delete files in any GitHub repository without cloning.
+
+## Table of Contents
+
+- [Installation](#installation)
+  - [Homebrew (macOS)](#homebrew-macos)
+  - [From Source](#from-source)
+  - [From GitHub Releases](#from-github-releases)
+  - [Agent Skill](#agent-skill)
+- [Upgrade](#upgrade)
+  - [Homebrew](#homebrew)
+  - [From Source](#from-source-1)
+  - [From GitHub Releases](#from-github-releases-1)
+  - [Agent Skill](#agent-skill-1)
+- [Authentication](#authentication)
+  - [Creating a GitHub Personal Access Token](#creating-a-github-personal-access-token)
+  - [Using Your Token](#using-your-token)
+  - [Best Practices](#best-practices)
+  - [Verify Authentication](#verify-authentication)
+- [Usage](#usage)
+  - [Initialize project](#initialize-project)
+  - [List directory contents](#list-directory-contents)
+  - [Show file or directory metadata](#show-file-or-directory-metadata)
+  - [Output file content](#output-file-content)
+  - [Download files or directories](#download-files-or-directories)
+  - [Create or update a file](#create-or-update-a-file)
+  - [Delete a file](#delete-a-file)
+- [Global Flags](#global-flags)
+- [License](#license)
 
 ## Installation
 
@@ -64,19 +94,54 @@ ghrepo requires a GitHub personal access token. You can provide it in three ways
 2. `GITHUB_TOKEN` environment variable
 3. `GH_TOKEN` environment variable
 
-```bash
-# Set token via environment variable
-export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+### Creating a GitHub Personal Access Token
 
-# Or pass it directly
+1. Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
+2. Click "Generate new token"
+3. Give your token a descriptive name (e.g., "ghrepo CLI")
+4. Select the following scopes:
+   - `public_repo` - For reading public repositories
+   - `repo` - For reading/writing private repositories (if needed)
+   - `gist` - Optional, for gist access
+5. Click "Generate token" and copy the token immediately
+6. **Keep your token secure** - treat it like a password
+
+### Using Your Token
+
+```bash
+# Option 1: Set as environment variable (recommended)
+export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+ghrepo cat owner/repo README.md
+
+# Option 2: Pass directly via flag (for single commands)
 ghrepo cat owner/repo README.md --token ghp_xxxxxxxxxxxx
+
+# Option 3: Use GH_TOKEN environment variable
+export GH_TOKEN="ghp_xxxxxxxxxxxx"
+ghrepo cat owner/repo README.md
 ```
 
-Verify your token is valid:
+### Best Practices
+
+- **Use environment variables** - Set `GITHUB_TOKEN` or `GH_TOKEN` in your shell profile for convenience
+- **Keep tokens secret** - Never commit tokens to version control
+- **Use `.bashrc` or `.zshrc`** - Add to your shell configuration for persistence across sessions:
+  ```bash
+  # Add to ~/.bashrc or ~/.zshrc
+  export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+  ```
+- **Rotate tokens periodically** - Update your tokens regularly for security
+- **Use token-specific names** - Create separate tokens for different purposes or machines
+
+### Verify Authentication
+
+Verify your token is valid and has the required permissions:
 
 ```bash
 ghrepo auth check
 ```
+
+This command will confirm that your token is working and show you what permissions are associated with it.
 
 ## Usage
 
