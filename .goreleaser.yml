@@ -1,0 +1,29 @@
+version: 2
+
+builds:
+  - main: ./cmd/ghrepo
+    binary: ghrepo
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats:
+      - tar.gz
+
+homebrew_casks:
+  - name: ghrepo
+    binaries:
+      - ghrepo
+    homepage: "https://github.com/JsonLee12138/ghrepo"
+    description: "Read-only GitHub repository CLI tool"
+    repository:
+      owner: JsonLee12138
+      name: homebrew-ghrepo
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
